@@ -1,7 +1,7 @@
 import certifi
 import os
 
-os.environ["SSL_CERT_FILE"] = certifi.where()
+os.environ["SSL_CERT_FILE"] = certifi.where() # This was a required workaround on my MacOS system. Might work without
 
 import discord
 from discord import app_commands, Embed
@@ -21,14 +21,15 @@ intents.message_content = True
 intents.members = True
 
 # Definitions
-PETITIONS_CHANNEL_ID = 1462204507269238804
+PETITIONS_CHANNEL_ID = 1462204507269238804 # The channel IDs are already set to #submit-world-petition and #world-votes in the CozyMC discord respectively
 VOTES_CHANNEL_ID = 1389992532967948369
-VOTING_TIME = time(hour=18, minute=0, tzinfo=datetime.now().astimezone().tzinfo)
+VOTING_TIME = time(hour=18, minute=0, tzinfo=datetime.now().astimezone().tzinfo) # Local hardware time
 
 bot = commands.Bot(command_prefix=">", intents=intents)
 
 database.init_db()
 
+# A function to create polls in vote channel. Called by the manual "push_petitions()" and the automatic "push_petition_task"
 async def push_pending_petitions():
     votes_channel = bot.get_channel(VOTES_CHANNEL_ID)
     petitions = database.get_pending_petitions()
@@ -47,7 +48,7 @@ async def push_pending_petitions():
 
 @bot.event
 async def on_ready():
-    if not push_petition_task.is_running():
+    if not push_petition_task.is_running(): # This needs to be running in the background to ensure petitions automatically get pushed Friday evening
         push_petition_task.start()
     print(f"{bot.user} is online!")
     await bot.tree.sync()
@@ -103,7 +104,7 @@ async def petition(
     except discord.NotFound:
         user_mention = f"<@{user_id}>"
 
-    # Send petition in "#petitions"
+    # Send petition in petition channel
     petitions_channel = bot.get_channel(PETITIONS_CHANNEL_ID)
     
     embed = Embed(
@@ -133,14 +134,14 @@ async def petition(
 
 # ----- Delete Petitions -----
 @bot.tree.command()
-@app_commands.checks.has_any_role("Moderator", "Admin")
+@app_commands.checks.has_any_role("Moderator", "Admin") # Because of the role check (instead of administrator check), this command is still visible to regular users, but when used by them always results in errors
 async def delete_petition(interaction: discord.Interaction, petition_id: int):
     database.hold_back(petition_id=petition_id)
     await interaction.response.send_message(f"Petition #{petition_id} has been removed from the queue! It will not appear in the next voting round.", ephemeral=True)
 
 # ----- Push Petitions -----
 @bot.tree.command()
-@app_commands.checks.has_permissions(administrator=True)
+@app_commands.checks.has_permissions(administrator=True) # This permission check completely hides the command to any non admin users
 async def push_petitions(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
     votes_channel = bot.get_channel(VOTES_CHANNEL_ID)
@@ -150,7 +151,7 @@ async def push_petitions(interaction: discord.Interaction):
 # ----- Automated Petitions every Friday -----
 @tasks.loop(time=VOTING_TIME)
 async def push_petition_task():
-    if datetime.now().weekday() != 4:
+    if datetime.now().weekday() != 4: # 4 = Friday. Increment or decrement to change weekday
         return
     await push_pending_petitions()
 
