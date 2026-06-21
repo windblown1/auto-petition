@@ -59,6 +59,7 @@ async def on_ready():
 
 # ----- Create Petition -----
 @bot.tree.command()
+@app_commands.checks.cooldown(rate=1, per=60, key=lambda i: i.user.id) # Each user has a 60s cooldown between uploading petitions
 # Fetch petition data
 @app_commands.describe(title="Short, descriptive and specific")
 @app_commands.describe(location="Exact coordinates, region name, or clear boundaries")
