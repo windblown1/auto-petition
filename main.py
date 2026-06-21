@@ -29,6 +29,10 @@ bot = commands.Bot(command_prefix=">", intents=intents)
 
 database.init_db()
 
+# Replaces @everyone and @here with its raw text. Called by "petition()" when creating the embed
+def catch_mentions(text: str):
+    return text.replace("@everyone", "@\u200beveryone").replace("@here","@\u200bhere")
+
 # A function to create polls in vote channel. Called by the manual "push_petitions()" and the automatic "push_petition_task"
 async def push_pending_petitions():
     votes_channel = bot.get_channel(VOTES_CHANNEL_ID)
@@ -111,18 +115,18 @@ async def petition(
         title=f"Petition #{petition_id}: {title}",
         description=f"**Submitted by:** {user_mention}"
     )
-    embed.add_field(name="Location", value=location, inline=True)
-    embed.add_field(name="Type", value=type, inline=True)
-    embed.add_field(name="State", value=state, inline=False)
-    embed.add_field(name="Proposal", value=proposal, inline=False)
-    embed.add_field(name="Impact", value=impact, inline=False)
-    embed.add_field(name="Scope", value=scope, inline=False)
-    embed.add_field(name="Duration", value=duration, inline=False)
-    embed.add_field(name="Maintenance", value=maintenance, inline=False)
-    embed.add_field(name="Alternatives", value=alternatives, inline=False)
-    embed.add_field(name="Acknowledgement", value=acknowledgement, inline=False)
+    embed.add_field(name="Location", value=catch_mentions(location), inline=True)
+    embed.add_field(name="Type", value=type, inline=True) # No custom user input
+    embed.add_field(name="State", value=catch_mentions(state), inline=False)
+    embed.add_field(name="Proposal", value=catch_mentions(proposal), inline=False)
+    embed.add_field(name="Impact", value=catch_mentions(impact), inline=False)
+    embed.add_field(name="Scope", value=catch_mentions(scope), inline=False)
+    embed.add_field(name="Duration", value=catch_mentions(duration), inline=False)
+    embed.add_field(name="Maintenance", value=catch_mentions(maintenance), inline=False)
+    embed.add_field(name="Alternatives", value=catch_mentions(alternatives), inline=False)
+    embed.add_field(name="Acknowledgement", value=acknowledgement, inline=False) # No custom user input
 
-    petition_message = await petitions_channel.send(embed=embed)
+    petition_message = await petitions_channel.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
 
     thread = await petition_message.create_thread(
         name=f"Petition #{petition_id}: {title}",
