@@ -99,16 +99,13 @@ async def petition(
     alternatives: str,
     acknowledgement: str
 ):
+    await interaction.response.defer(ephemeral=True)
     # Save petition to database
     user_id = interaction.user.id
     petition_id = database.add_petition(type=type)
 
     # Fetch @user
-    try:
-        user = await bot.fetch_user(user_id)
-        user_mention = user.mention
-    except discord.NotFound:
-        user_mention = f"<@{user_id}>"
+   user_mention = interaction.user.mention
 
     # Send petition in petition channel
     petitions_channel = bot.get_channel(PETITIONS_CHANNEL_ID)
@@ -136,7 +133,7 @@ async def petition(
     )
 
     database.update_thread_link(thread_link=thread.mention, petition_id=petition_id)
-    await interaction.response.send_message(f"Petition saved for review. Screenshots can be added in the discussion thread {thread.mention}. Votes will start on Friday!", ephemeral=True)
+    await interaction.followup.send(f"Petition saved for review. Screenshots can be added in the discussion thread {thread.mention}. Votes will start on Friday!", ephemeral=True)
 
 # ----- Delete Petitions -----
 @bot.tree.command()
