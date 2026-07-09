@@ -38,6 +38,8 @@ async def push_pending_petitions():
     votes_channel = bot.get_channel(VOTES_CHANNEL_ID)
     petitions = database.get_pending_petitions()
     for i in petitions:
+        await votes_channel.send(f"Every petition requires at least 60% approval to pass!\n\n\n**Discussion thread for vote #{i[0]}:** {i[2]}")
+
         petition_type = "petition" if i[1] == "Other" else i[1]
 
         # Create Poll
@@ -45,10 +47,21 @@ async def push_pending_petitions():
         poll.add_answer(text="👍 Yes")
         poll.add_answer(text="👎 No")
 
-        poll_message = await votes_channel.send(poll=poll)
-        await poll_message.reply(f"**Discussion thread:** {i[2]}")
+        await votes_channel.send(poll=poll)
 
         database.add_to_voted(i[0])
+
+# Fetches petition status from the database. Called by "get_petition_status", "delete_petition" and "revive_petition"
+async def get_status(id):
+    petition = database.get_petition(id)
+    if petition == None:
+        return "Empty"
+    elif petition[4] == 0:
+        return "Pending"
+    elif petition[4] == 1:
+        return "Voted"
+    elif petition[4] == 2:
+        return "Deleted"
 
 @bot.event
 async def on_ready():
@@ -56,6 +69,17 @@ async def on_ready():
         push_petition_task.start()
     print(f"{bot.user} is online!")
     await bot.tree.sync()
+
+# Error handling to notify users when they create petitions to fast
+@bot.tree.error
+async def petition_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    if isinstance(error, app_commands.CheckFailure):
+        await interaction.response.send_message(
+            f"Upload failed. Please wait a minute between uploading petitions!",
+            ephemeral=True
+        )
+        return
+    raise error
 
 # ----- Create Petition -----
 @bot.tree.command()
@@ -142,8 +166,31 @@ async def petition(
 @bot.tree.command()
 @app_commands.checks.has_any_role("Moderator", "Admin") # Because of the role check (instead of administrator check), this command is still visible to regular users, but when used by them always results in errors
 async def delete_petition(interaction: discord.Interaction, petition_id: int):
-    database.hold_back(petition_id=petition_id)
-    await interaction.response.send_message(f"Petition #{petition_id} has been removed from the queue! It will not appear in the next voting round.", ephemeral=True)
+    status = await get_status(id=petition_id)
+    if status == "Empty":
+        await interaction.response.send_message(f"Couldn't delete petition #{petition_id} because it doesn't exist yet!", ephemeral=True)
+    elif status == "Pending":
+        database.hold_back(petition_id=petition_id)
+        await interaction.response.send_message(f"Petition #{petition_id} has been removed from the queue! It will not appear in the next voting round.", ephemeral=True)
+    elif status == "Voted":
+        await interaction.response.send_message(f"Couldn't delete petition #{petition_id} because it has already been pushed to vote.", ephemeral=True)
+    elif status == "Deleted":
+        await interaction.response.send_message(f"Petition #{petition_id} has already been deleted!", ephemeral=True)
+
+# ----- Revive Petitions -----
+@bot.tree.command()
+@app_commands.checks.has_any_role("Moderator", "Admin")
+async def revive_petition(interaction: discord.Interaction, petition_id: int):
+    status = await get_status(id=petition_id)
+    if status == "Empty":
+        await interaction.response.send_message(f"Couldn't revive petition #{petition_id} because it doesn't exist yet!", ephemeral=True)
+    elif status == "Pending":
+        await interaction.response.send_message(f"Petition #{petition_id} is already active!", ephemeral=True)
+    elif status == "Voted":
+        await interaction.response.send_message(f"Couldn't revive petition #{petition_id} because it has already been pushed to vote.", ephemeral=True)
+    elif status == "Deleted":
+        await interaction.response.send_message(f"Petition #{petition_id} has been added back to the queue! It will appear in the next voting round.", ephemeral=True)
+        database.revive(petition_id=petition_id)
 
 # ----- Push Petitions -----
 @bot.tree.command()
@@ -153,6 +200,12 @@ async def push_petitions(interaction: discord.Interaction):
     votes_channel = bot.get_channel(VOTES_CHANNEL_ID)
     await push_pending_petitions()
     await interaction.followup.send(f"Petitions now put up for vote in {votes_channel.mention}!", ephemeral=True)
+
+# ----- Check Petition Status -----
+@bot.tree.command()
+async def get_petition_status(interaction: discord.Interaction, petition_id: int):
+    status = await get_status(id=petition_id)
+    await interaction.response.send_message(f"Status of petition #{petition_id}: {status}", ephemeral=True)
 
 # ----- Automated Petitions every Friday -----
 @tasks.loop(time=VOTING_TIME)
