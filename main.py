@@ -129,7 +129,7 @@ async def petition(
     petition_id = database.add_petition(type=type)
 
     # Fetch @user
-   user_mention = interaction.user.mention
+    user_mention = interaction.user.mention
 
     # Send petition in petition channel
     petitions_channel = bot.get_channel(PETITIONS_CHANNEL_ID)
