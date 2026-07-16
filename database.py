@@ -41,15 +41,18 @@ def update_thread_link(petition_id, thread_link):
 
 def hold_back(petition_id):
     with sqlite3.connect(DATABASE) as conn:
-        result = conn.execute(
-            "SELECT id FROM petitions WHERE id = ?", (petition_id,)
-        )
-        if not result:
-            return False
-        
         conn.execute("""
             UPDATE petitions
             SET vote = 2
+            WHERE id = ?
+        """, (petition_id,))
+        return True
+    
+def revive(petition_id):
+    with sqlite3.connect(DATABASE) as conn:
+        conn.execute("""
+            UPDATE petitions
+            SET vote = 0
             WHERE id = ?
         """, (petition_id,))
         return True
